@@ -31,7 +31,7 @@ import scipy.io.matlab.byteordercodes as boc
 from scipy.io.matlab.miobase import matdims, MatWriteError
 from scipy.io.matlab.mio import (mat_reader_factory, loadmat, savemat, whosmat)
 from scipy.io.matlab.mio5 import (MatlabObject, MatFile5Writer, MatFile5Reader,
-                                  MatlabFunction, varmats_from_mat)
+                                  MatlabFunction, MatlabOpaque, varmats_from_mat)
 
 
 test_data_path = pjoin(dirname(__file__), 'data')
@@ -202,7 +202,7 @@ fp_u_str.close()
 case_table5.append(
     {'name': 'unicode',
      'classes': {'testunicode': 'char'},
-    'expected': {'testunicode': array([u_str])}
+     'expected': {'testunicode': array([u_str])}
      })
 case_table5.append(
     {'name': 'sparse',
@@ -220,8 +220,15 @@ case_table5.append(
      'expected': {'testbools':
                   array([[True], [False]])},
      })
+case_table5.append( # Note that this will be popped for roundtripping tests.
+    {'name': 'class',
+     'classes': {'testclass': 'classname'},
+     'expected': {'testclass': MatlabOpaque([])}
+    })
 
 case_table5_rt = case_table5[:]
+# Matlab objects can't be created from Python, so remove that test case.
+case_table5_rt.pop()
 # Inline functions can't be concatenated in matlab, so RT only
 case_table5_rt.append(
     {'name': 'objectarray',
@@ -299,7 +306,8 @@ def _load_check_case(name, files, case):
         for k, expected in case.items():
             k_label = "%s, variable %s" % (label, k)
             assert_(k in matdict, "Missing key at %s" % k_label)
-            _check_level(k_label, expected, matdict[k])
+            if expected is None: # Escape MatlabOpaque here.
+                _check_level(k_label, expected, matdict[k])
 
 
 def _whos_check_case(name, files, case, classes):
@@ -309,8 +317,11 @@ def _whos_check_case(name, files, case, classes):
         whos = whosmat(file_name)
 
         expected_whos = []
-        for k, expected in case.items():
+        for i, ((k, expected), (name, shape, tp)) in (
+            enumerate(zip(case.items(), whos))):
             expected_whos.append((k, expected.shape, classes[k]))
+            if shape is None: # Escape MatlabOpaque here.
+                whos[i] = expected_whos[-1]
 
         whos.sort()
         expected_whos.sort()

@@ -190,6 +190,29 @@ class MatFile5Reader(MatFileReader):
 
         Sets up readers from parameters in `self`
         '''
+        # find subsystem
+        header = self.mat_stream.read(124)
+        self.mat_stream.seek(-124, 1)
+        tell = self.mat_stream.tell()
+        self.mat_stream.seek(0, 2)
+        size = self.mat_stream.tell() - tell
+        self.mat_stream.seek(tell + 116)
+        subsys_offset = self.mat_stream.read(8)
+        subsys_offset = (
+            0 if subsys_offset == b"\x20" * 8
+            else np.fromstring(subsys_offset,
+                               np.dtype(self.byte_order + "i8")).item())
+        if subsys_offset:
+            self.mat_stream.seek(tell + subsys_offset)
+            subsystem = VarReader5(self).read_mi_matrix().tostring()
+            if self.mat_stream.tell() != size:
+                raise ValueError("Unread data at end of subsystem")
+            # a mat-file is stored in this matrix's data
+            from .mio import loadmat
+            # zero out the subsystem location
+            subsystem = header[:116] + b"\0" * 8 + subsystem[:4] + subsystem[8:]
+            print(loadmat(BytesIO(subsystem)))
+        self.mat_stream.seek(tell)
         # reader for top level stream.  We need this extra top-level
         # reader because we use the matrix_reader object to contain
         # compressed matrices (so they have their own stream)

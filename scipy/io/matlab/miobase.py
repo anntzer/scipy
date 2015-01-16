@@ -225,7 +225,7 @@ def get_matfile_version(fileobj):
     mopt_ints = np.ndarray(shape=(4,), dtype=np.uint8, buffer=mopt_bytes)
     if 0 in mopt_ints:
         fileobj.seek(0)
-        return (0,0)
+        return (0, 0)
     # For 5 format or 7.3 format we need to read an integer in the
     # header. Bytes 124 through 128 contain a version integer and an
     # endian test string

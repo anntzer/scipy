@@ -204,14 +204,14 @@ cdef class VarReader5:
                 continue
             self.class_dtypes[key] = <PyObject*>dt
         self.bool_dtype = np.dtype('bool')
-        
+
     def set_stream(self, fobj):
         ''' Set stream of best type from file-like `fobj`
 
         Called from Python when initiating a variable read
         '''
         self.cstream = streams.make_stream(fobj)
-        
+
     def read_tag(self):
         ''' Read tag mdtype and byte_count
 
@@ -949,8 +949,28 @@ cdef class VarReader5:
         See the comments at the beginning of ``mio5.py``
         '''
         cdef cnp.ndarray res = np.empty((1,), dtype=OPAQUE_DTYPE)
-        res[0]['s0'] = self.read_int8_string()
-        res[0]['s1'] = self.read_int8_string()
-        res[0]['s2'] = self.read_int8_string()
-        res[0]['arr'] = self.read_mi_matrix()
+        name = self.read_int8_string()
+        class_system = self.read_int8_string()
+        if class_system != b"MCOS":
+            raise ValueError(
+                "Unknown opaque class system: {}".format(class_system))
+        class_name = self.read_int8_string()
+        ids = self.read_mi_matrix()
+        ids = ids.flat
+        if class_name == "FileWrapper__":
+            return ids[1]
+        if ids[0] != 0xdd000000:
+            raise ValueError("Unknown opaque sentinel: {}".format(ids[0]))
+        ndims = ids[1]
+        dims = ids[2 : 2 + ndims]
+        nels = np.product(dims) if ndims else 0
+        if len(ids) != 3 + ndims + nels:
+            raise ValueError("Unexpected data at end of opaque id")
+        object_ids = ids[2 + ndims : -1]
+        class_id = ids[-1]
+        #res[0]["class"] = 
+        #res[0]['s0'] = self.read_int8_string()
+        #res[0]['s1'] = self.read_int8_string()
+        #res[0]['s2'] = self.read_int8_string()
+        #res[0]['arr'] = self.read_mi_matrix()
         return res
